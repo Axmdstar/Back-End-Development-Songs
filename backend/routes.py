@@ -51,3 +51,74 @@ def parse_json(data):
 ######################################################################
 # INSERT CODE HERE
 ######################################################################
+
+@app.route("/health", methods=["GET"])
+def heath():
+    songs=db.songs.find()
+    return {"status":"OK"},200
+
+
+@app.route("/count", methods=["GET"])
+def count():
+    count = db.songs.count_documents({})
+    return {"count": count}, 200
+
+@app.route("/song", methods=["GET"])
+def songs():
+    songs = list(db.songs.find())
+    return jsonify(parse_json(songs)), 200
+
+@app.route("/song/<int:id>", methods=["GET"])
+def get_song_by_id(id):
+    song = db.songs.find_one({"id": id})
+    if song:
+        return jsonify(parse_json(song)), 200
+    else:
+        return {"message":"not found"}, 404
+
+@app.route("/song", methods=["POST"])
+def create_song():
+    song = request.get_json()
+    
+    if not song:
+        return jsonify({"error": "Invalid JSON body"}), 400
+
+    existing = db.songs.find_one({"id": song.get("id")})
+    if existing:
+        return jsonify({"Message": f"song with id {song['id']} already present"}), 309
+
+    result = db.songs.insert_one(song)
+    song["_id"] = str(result.inserted_id)
+    
+    return jsonify(song), 201
+
+
+@app.route("/song/<id>", methods=["PUT"])
+def update_song(id):
+    song_update = request.get_json()
+    if not song_update:
+        return jsonify({"error": "Invalid JSON body"}), 400
+
+    try:
+        obj_id = ObjectId(id)
+    except Exception:
+        return jsonify({"error": "Invalid ObjectId format"}), 400
+
+    song_update.pop("_id", None)
+    
+    result = db.songs.update_one({"_id": obj_id}, {"$set": song_update})
+    
+    if result.matched_count == 0:
+        return jsonify({"error": "Song not found"}), 404
+
+    updated = db.songs.find_one({"_id": obj_id})
+    return jsonify(parse_json(updated)), 200
+
+@app.route("/song/<int:id>", methods=["DELETE"])
+def delete_song(id):
+    result = db.songs.delete_one({"id": id})
+    
+    if result.deleted_count == 0:
+        return jsonify({"message": "song not found"}), 404
+    
+    return "", 204
